@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#24205a">
+<title>Multiplica al vuelo</title>
+<link rel="stylesheet" href="estilos.css">
+<script src="juego.js" defer></script>
+</head>
+<body>
+<main class="shell">
+<header class="masthead">
+  <div class="brand"><span class="logo" aria-hidden="true">✦</span> Recreo de mates</div>
+  <div class="record"><span aria-hidden="true">🏆</span> Récord <strong id="record">0/10</strong></div>
+</header>
+<section class="hero">
+  <p class="eyebrow">TABLAS DEL 1 AL 12</p>
+  <h1>Multiplica <em>al vuelo</em></h1>
+  <p>Diez preguntas por ronda. ¿Cuántas aciertas?</p>
+  <div class="planet" aria-hidden="true"><span>×</span></div>
+  <span class="spark s1" aria-hidden="true">✧</span><span class="spark s2" aria-hidden="true">✦</span>
+</section>
+<div class="layout">
+  <section class="game" aria-label="Partida">
+    <div class="game-head">
+      <span id="progress-label">Pregunta 1 de 10</span>
+      <span id="streak"><span aria-hidden="true">⚡</span> Racha 0</span>
+    </div>
+    <progress id="progress" value="0" max="10" aria-label="Preguntas respondidas"></progress>
+    <div id="round">
+      <h2 id="problem" tabindex="-1"></h2>
+      <div id="answers" class="answers" aria-label="Opciones de respuesta"></div>
+      <div class="feedback">
+        <p id="message" role="status"></p>
+        <button id="next" class="primary" type="button" hidden>Siguiente</button>
+      </div>
+    </div>
+    <div id="summary" hidden>
+      <div class="medal" aria-hidden="true">★</div>
+      <h2 id="result" tabindex="-1"></h2>
+      <p id="result-note"></p>
+      <ul id="review"></ul>
+      <button id="again" type="button" class="primary">Jugar otra vez</button>
+    </div>
+  </section>
+  <aside class="settings" aria-labelledby="settings-title">
+    <span class="tile" aria-hidden="true">×</span>
+    <h2 id="settings-title">Elige una tabla</h2>
+    <p>Practica una tabla o mezcla las doce.</p>
+    <button type="button" class="mix" data-table="0" aria-pressed="true"><span aria-hidden="true">✦</span> Todas las tablas</button>
+    <div id="tables" class="tables"></div>
+  </aside>
+</div>
+<p class="keyboard">Con el teclado, pulsa <kbd>1</kbd>–<kbd>4</kbd> para responder y <kbd>Enter</kbd> para seguir.</p>
+</main>
+</body>
+</html>

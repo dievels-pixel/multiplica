@@ -1,0 +1,17 @@
+# Multiplica al vuelo
+
+Juego en español para practicar las tablas del 1 al 12. Elige una tabla o mezcla las doce. Cada ronda tiene diez preguntas, con corrección inmediata y un repaso al final. El récord se guarda en el navegador.
+
+## Jugar
+
+Abre `index.html` en tu navegador. Puedes tocar las opciones o usar las teclas 1 a 4 y Enter.
+
+## Publicar en GitHub Pages
+
+1. Crea un repositorio público, por ejemplo `multiplica-al-vuelo`.
+2. Sube los archivos de esta carpeta a la raíz de la rama `main`.
+3. En el repositorio abre **Settings → Pages**. En **Build and deployment**, selecciona **Deploy from a branch**, elige `main` y `/ (root)`, y guarda.
+4. Cuando GitHub termine, abre **Settings → Pages** y copia el enlace que aparece en **Visit site** para compartirlo.
+
+La aplicación usa HTML, CSS y JavaScript y funciona sin instalar dependencias.
+
