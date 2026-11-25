@@ -73,3 +73,7 @@ kbd { display: inline-block; border-radius: 5px; color: #f5ecff; background: #32
   .hero h1 { max-width: none; }
   .game, .settings { padding: 16px; }
 }
+
+.masthead { flex-wrap: wrap; }
+.hotel-link { color: #30205d; background: #ffdc72; border-radius: 12px; padding: 9px 12px; font-weight: 850; text-underline-offset: 3px; }
+.hotel-link:hover { background: #ffebaa; }

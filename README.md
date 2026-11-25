@@ -2,6 +2,10 @@
 
 Juego en español para practicar las tablas del 1 al 12. Elige una tabla o mezcla las doce. Cada ronda tiene diez preguntas, con corrección inmediata y un repaso al final. El récord se guarda en el navegador.
 
+## Hotel Multiplica
+
+Abre [Hotel Multiplica](https://dievels-pixel.github.io/multiplica/hotel/) para practicar las tablas mientras atiendes un hotel. Cada acierto da monedas, y la satisfacción de los huéspedes aumenta la propina. Usa las monedas para construir habitaciones, comedores y baños, ampliar el hotel, contratar empleados y limpiar. El progreso se guarda en el navegador.
+
 ## Jugar
 
 Abre `index.html` en tu navegador. Puedes tocar las opciones o usar las teclas 1 a 4 y Enter.
