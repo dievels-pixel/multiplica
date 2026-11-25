@@ -15,10 +15,16 @@ const guests = [
   ["👩🏻", "Aitana", "¡Qué ganas de descansar en mi habitación!"],
   ["🧑🏼", "Nico", "Ojalá pueda desayunar antes de ir a la piscina."],
 ];
-const defaults = { coins: 20, stays: 0, wear: 0, rooms: 1, dining: 0, baths: 1, staff: 1, expansions: 0, table: 0, streak: 0, gifts: 0, incident: 0, reputation: 1 };
+const defaults = { coins: 20, stays: 0, wear: 0, rooms: 1, dining: 0, baths: 1, staff: 1, expansions: 0, table: 0, streak: 0, gifts: 0, incident: 0, reputation: 1, stars: 1, prestige: 0 };
 const storageKey = "hotel-multiplica-v1";
-const seconds = 15;
-const serviceWindow = 5;
+const seconds = 5;
+const levels = [
+  { target: null, gain: 24, lateLoss: 0, missLoss: 28 },
+  { target: 4, gain: 23, lateLoss: 10, missLoss: 32 },
+  { target: 3, gain: 21, lateLoss: 14, missLoss: 36 },
+  { target: 2, gain: 19, lateLoss: 18, missLoss: 40 },
+  { target: 1, gain: 15, lateLoss: 24, missLoss: 45 },
+];
 const prizes = ["🏊 Piscina", "🗿 Estatua", "🌴 Jardín tropical"];
 const disasters = [
   "Se atascó una ducha y se inundó el pasillo.",
@@ -44,12 +50,9 @@ const timer = byId("timer");
 let guestIndex = state.stays;
 
 function load() {
-  const result = { ...defaults, reviews: [] };
+  const result = { ...defaults };
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
-    if (Array.isArray(saved?.reviews)) {
-      result.reviews = saved.reviews.filter((value) => Number.isInteger(value) && value >= 0 && value <= 5).slice(-serviceWindow);
-    }
     for (const [key, minimum] of Object.entries(defaults)) {
       const value = saved?.[key];
       const min = key === "coins" ? 0 : minimum;
@@ -61,7 +64,9 @@ function load() {
   result.table = Math.min(12, result.table);
   result.wear = Math.min(36, result.wear);
   result.gifts = Math.min(prizes.length, result.gifts);
-  result.reputation = Math.min(5, result.reputation);
+  result.stars = Math.min(5, result.stars);
+  result.prestige = Math.min(100, result.prestige);
+  result.reputation = Math.max(result.stars, Math.min(5, result.reputation));
   result.incident = Math.min(36, result.incident);
   return result;
 }
@@ -90,27 +95,28 @@ function occupancy() {
   };
 }
 
-function serviceScore(fraction) {
-  if (fraction <= .25) return 5;
-  if (fraction <= .4) return 4;
-  if (fraction <= .65) return 3;
-  return fraction < 1 ? 2 : 1;
-}
-
 function satisfaction() {
   const needs = occupancy();
-  const servicePenalty = state.reviews.length ?
-    (5 - state.reviews.reduce((sum, score) => sum + score, 0) / state.reviews.length) * 3 : 0;
   return Math.max(15, Math.min(100, Math.round(100 - needs.waitlist * 3 - Math.min(32, needs.dining * 10 + needs.baths * 11 + needs.staff * 12)
-    - Math.round(state.wear / 2) - state.incident - servicePenalty + state.gifts * 3)));
+    - Math.round(state.wear / 2) - state.incident + state.gifts * 3)));
 }
 
-function rating() {
-  if (!state.reviews.length) return 1;
-  const average = state.reviews.reduce((sum, score) => sum + score, 0) / state.reviews.length;
-  const perfect = state.reviews.length === serviceWindow && state.reviews.every((score) => score === 5);
-  if (perfect && satisfaction() >= 88) return 5;
-  return Math.max(1, Math.min(4, Math.round(average), Math.floor(satisfaction() / 20)));
+function updatePrestige(correct, milliseconds) {
+  const previousStars = state.stars;
+  const level = levels[previousStars - 1];
+  const fast = level.target === null || milliseconds <= level.target * 1000;
+  const change = correct ? (fast ? level.gain : -level.lateLoss) : -level.missLoss;
+  const oldPrestige = state.prestige;
+  state.prestige = Math.max(0, Math.min(100, oldPrestige + change));
+  const applied = state.prestige - oldPrestige;
+  if (state.prestige === 100 && previousStars < 5) {
+    state.stars++;
+    state.prestige = 40;
+  } else if (state.prestige === 0 && change < 0 && previousStars > 1) {
+    state.stars--;
+    state.prestige = 55;
+  }
+  return applied;
 }
 
 function earnings(fraction = 0) {
@@ -127,10 +133,13 @@ function price(upgrade) {
 function paintTimer(fraction, waiting = false) {
   const remaining = Math.max(0, seconds * (1 - fraction));
   timer.firstElementChild.style.transform = "scaleX(" + remaining / seconds + ")";
-  timer.dataset.phase = fraction <= .25 ? "fast" : fraction <= .65 ? "medium" : "slow";
+  const target = levels[state.stars - 1].target;
+  timer.dataset.phase = fraction >= 1 ? "slow" : target !== null && fraction > target / seconds ? "medium" : "fast";
+  timer.dataset.target = target === null ? "none" : "marked";
+  timer.style.setProperty("--target", (target / seconds * 100) + "%");
   timer.setAttribute("aria-valuenow", Math.ceil(remaining));
   byId("time-text").textContent = waiting ? seconds + " s por huésped" :
-    (remaining ? Math.ceil(remaining) + " s" : "Propina mínima");
+    (remaining ? (Math.ceil(remaining * 10) / 10).toLocaleString("es-ES") + " s" : "Propina mínima");
   const pay = earnings(fraction);
   byId("reward").textContent = pay.base + " monedas + " + pay.tip + " de propina";
 }
@@ -151,7 +160,7 @@ function shortage(quantity, singular, plural) {
 
 function refresh() {
   const happy = Math.min(100, satisfaction());
-  const stars = rating();
+  const stars = state.stars;
   const needs = occupancy();
   byId("coins").textContent = state.coins;
   byId("happiness").textContent = happy + "%";
@@ -160,7 +169,12 @@ function refresh() {
   byId("space").textContent = space + (space === 1 ? " espacio libre" : " espacios libres");
   byId("rating").textContent = stars === 1 ? "1 estrella" : stars + " estrellas";
   byId("stars").textContent = "★".repeat(stars) + "☆".repeat(5 - stars);
-  byId("goal").textContent = "Reputación " + state.reputation + "/5 · Para tener 5 estrellas, acierta los últimos 5 en el primer cuarto y mantén la satisfacción en el 88% o más.";
+  byId("prestige").value = state.prestige;
+  byId("prestige-value").textContent = state.prestige + "%";
+  const target = levels[stars - 1].target;
+  byId("pace").textContent = target === null ? "Cada acierto suma prestigio, aunque se agote el tiempo." :
+    "Acierta en " + target + (target === 1 ? " segundo" : " segundos") + (stars === 5 ? " para mantener el nivel." : " o menos para ganar prestigio.");
+  byId("goal").textContent = "Reputación histórica " + state.reputation + "/5 · Cuanto más alta, mayores ingresos y precios.";
   byId("streak").textContent = "🔥 Racha: " + state.streak + " · Próximo premio a los " + (Math.floor(state.streak / 10) + 1) * 10 + " aciertos.";
   byId("capacity").textContent = needs.guests + " huéspedes en " + state.rooms * 2 + " plazas";
   const complaints = [];
@@ -297,14 +311,14 @@ function showQuestion(focus = true) {
 
 function answer(value) {
   if (answered) return;
-  const fraction = elapsed();
+  const now = performance.now();
+  const fraction = elapsed(now);
   cancelAnimationFrame(frame);
   paintTimer(fraction);
   answered = true;
   table.disabled = false;
   const correct = value === current.product;
-  const previousStars = rating();
-  const score = correct ? serviceScore(fraction) : 0;
+  const previousStars = state.stars;
   let message;
   let event = "";
   if (correct) {
@@ -315,7 +329,7 @@ function answer(value) {
     state.incident = Math.max(0, state.incident - 3);
     const workload = Math.floor(occupancy().guests / Math.max(1, state.staff * 3));
     state.wear = Math.min(36, state.wear + Math.max(1, 1 + workload - Math.min(2, state.staff)));
-    message = "¡Acierto! +" + base + " monedas y +" + tip + " de propina. Servicio: " + score + "/5.";
+    message = "¡Acierto! +" + base + " monedas y +" + tip + " de propina.";
     if (state.streak % 10 === 0) {
       if (state.gifts < prizes.length) {
         event = "¡Racha de " + state.streak + "! Los huéspedes te regalan: " + prizes[state.gifts++] + ".";
@@ -334,15 +348,16 @@ function answer(value) {
     message = "Casi. " + current.a + " × " + current.b + " = " + current.product + ".";
     next.textContent = "Otra multiplicación";
   }
-  state.reviews.push(score);
-  if (state.reviews.length > serviceWindow) state.reviews.shift();
-  const stars = rating();
+  const prestige = updatePrestige(correct, now - startedAt);
+  const stars = state.stars;
   const reputation = state.reputation;
-  state.reputation = Math.max(reputation, Math.min(stars, 1 + Math.floor(state.stays / 5)));
-  if (state.reputation > reputation) event += " ¡Sube tu reputación! Aumentan los ingresos y los precios.";
-  else if (stars < previousStars) event += " El hotel baja a " + stars + (stars === 1 ? " estrella." : " estrellas.");
+  state.reputation = Math.max(reputation, stars);
+  if (stars > previousStars) event += " ¡Subes a " + stars + " estrellas!";
+  if (stars < previousStars) event += " El hotel baja a " + stars + (stars === 1 ? " estrella." : " estrellas.");
+  if (state.reputation > reputation) event += " Aumentan los ingresos y los precios.";
+  if (prestige) message += " " + (prestige > 0 ? "+" : "−") + Math.abs(prestige) + " de prestigio.";
   byId("event").textContent = event.trim();
-  byId("event").dataset.kind = correct ? "good" : "bad";
+  byId("event").dataset.kind = correct && stars >= previousStars ? "good" : "bad";
   byId("feedback").textContent = message;
   save();
   for (const button of answers.children) {

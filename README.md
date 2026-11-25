@@ -4,7 +4,7 @@ Juego en español para practicar las tablas del 1 al 12. Elige una tabla o mezcl
 
 ## Hotel Multiplica
 
-Abre [Hotel Multiplica](https://dievels-pixel.github.io/multiplica/hotel/) para practicar las tablas mientras atiendes un hotel. Cada acierto da monedas, y la satisfacción de los huéspedes aumenta la propina. Usa las monedas para construir habitaciones, comedores y baños, ampliar el hotel, contratar empleados y limpiar. Cada huésped tiene 15 segundos de propina decreciente. Al acabar el tiempo aún puedes responder y recibir una moneda de propina. Las estrellas reflejan los últimos cinco servicios, mientras que la reputación conserva el nivel alcanzado y aumenta los ingresos y los precios. Cada diez aciertos seguidos llegan regalos o monedas extra. El progreso se guarda en el navegador.
+Abre [Hotel Multiplica](https://dievels-pixel.github.io/multiplica/hotel/) para practicar las tablas mientras atiendes un hotel. Cada acierto da monedas, y la satisfacción de los huéspedes aumenta la propina. Usa las monedas para construir habitaciones, comedores y baños, ampliar el hotel, contratar empleados y limpiar. Cada huésped tiene 5 segundos de propina decreciente. Al acabar el tiempo aún puedes responder y recibir una moneda de propina. Llena la barra de prestigio para subir de estrella. Con una estrella basta acertar. Los siguientes niveles exigen responder en un máximo de 4, 3, 2 y 1 segundos. Las respuestas lentas en esos niveles y los fallos restan prestigio. La reputación histórica conserva el nivel alcanzado y aumenta los ingresos y los precios. Cada diez aciertos seguidos llegan regalos o monedas extra. El progreso se guarda en el navegador.
 
 ## Jugar
 

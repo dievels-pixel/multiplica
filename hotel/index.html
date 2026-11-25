@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#123d34">
   <title>Hotel Multiplica</title>
-  <link rel="stylesheet" href="hotel.css?v=2">
-  <script src="hotel.js?v=2" defer></script>
+  <link rel="stylesheet" href="hotel.css?v=3">
+  <script src="hotel.js?v=3" defer></script>
 </head>
 <body>
   <header class="top">
@@ -21,7 +21,6 @@
         <p class="eyebrow">Recepción · Tablas del 1 al 12</p>
         <h1 id="title">Hotel<br> <em>Multiplica</em></h1>
         <p>Acierta multiplicaciones, mejora tu hotel y gana más propinas con huéspedes felices.</p>
-        <p class="rating"><span id="stars" aria-hidden="true"></span> <strong id="rating"></strong></p>
       </div>
       <img class="hotel-art" src="hotel.webp" alt="Ilustración de un hotel con tejados coral y palmeras">
     </section>
@@ -39,13 +38,20 @@
             <select id="table"><option value="0">Todas las tablas</option></select>
           </label>
         </div>
+        <div class="rating">
+          <strong id="rating"></strong>
+          <span id="stars" aria-hidden="true"></span>
+          <div class="prestige-head"><strong id="prestige-label">Prestigio</strong><span id="prestige-value" aria-hidden="true"></span></div>
+          <progress id="prestige" max="100" value="0" aria-labelledby="prestige-label"></progress>
+          <p id="pace"></p>
+        </div>
         <div class="guest">
           <span id="avatar" class="avatar" aria-hidden="true"></span>
           <div><strong id="guest-name"></strong><p id="guest-request"></p></div>
         </div>
         <div class="service">
           <div class="timer-head"><strong id="time-label">Tiempo de servicio</strong><span id="time-text"></span></div>
-          <div id="timer" class="timer" role="progressbar" aria-labelledby="time-label" aria-valuemin="0" aria-valuemax="15" aria-valuenow="15"><span></span></div>
+          <div id="timer" class="timer" role="progressbar" aria-labelledby="time-label" aria-valuemin="0" aria-valuemax="5" aria-valuenow="5"><span></span></div>
           <p class="reward" id="reward"></p>
         </div>
         <h3 tabindex="-1" id="question"></h3>
