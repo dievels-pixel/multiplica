@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#123d34">
   <title>Hotel Multiplica</title>
-  <link rel="stylesheet" href="hotel.css">
-  <script src="hotel.js" defer></script>
+  <link rel="stylesheet" href="hotel.css?v=2">
+  <script src="hotel.js?v=2" defer></script>
 </head>
 <body>
   <header class="top">
@@ -23,13 +23,14 @@
         <p>Acierta multiplicaciones, mejora tu hotel y gana más propinas con huéspedes felices.</p>
         <p class="rating"><span id="stars" aria-hidden="true"></span> <strong id="rating"></strong></p>
       </div>
-      <img class="hotel-art" src="hotel.webp" alt="Un hotel con tejados coral, palmeras y una piscina">
+      <img class="hotel-art" src="hotel.webp" alt="Ilustración de un hotel con tejados coral y palmeras">
     </section>
     <section class="stats" aria-label="Estado del hotel">
       <div class="stat"><span aria-hidden="true">🪙</span><div>Monedas<strong id="coins"></strong></div></div>
       <div class="stat"><span aria-hidden="true">😊</span><div>Satisfacción<strong id="happiness"></strong></div></div>
       <div class="stat"><span aria-hidden="true">🧳</span><div>Estancias completadas<strong id="stays"></strong></div></div>
     </section>
+    <section id="awards" class="awards" aria-label="Premios del hotel" hidden></section>
     <div class="columns">
       <section class="panel reception" aria-labelledby="reception-title">
         <div class="panel-head">
@@ -42,13 +43,19 @@
           <span id="avatar" class="avatar" aria-hidden="true"></span>
           <div><strong id="guest-name"></strong><p id="guest-request"></p></div>
         </div>
-        <p class="reward" id="reward"></p>
+        <div class="service">
+          <div class="timer-head"><strong id="time-label">Tiempo de servicio</strong><span id="time-text"></span></div>
+          <div id="timer" class="timer" role="progressbar" aria-labelledby="time-label" aria-valuemin="0" aria-valuemax="15" aria-valuenow="15"><span></span></div>
+          <p class="reward" id="reward"></p>
+        </div>
         <h3 tabindex="-1" id="question"></h3>
         <div class="answers" id="answers" aria-label="Respuestas"></div>
         <div class="feedback">
           <p id="feedback" role="status"></p>
           <button id="next" type="button" class="primary" hidden>Siguiente huésped</button>
         </div>
+        <p id="streak" class="streak"></p>
+        <p id="event" class="event" role="status"></p>
         <p class="keyboard">Teclas 1–4 para responder. Enter para seguir.</p>
       </section>
       <section class="panel management" aria-labelledby="management-title">
@@ -57,6 +64,8 @@
           <span class="space" id="space"></span>
         </div>
         <p id="goal"></p>
+        <p id="capacity"></p>
+        <ul id="complaints" aria-label="Necesidades de los huéspedes"></ul>
         <div id="upgrades"></div>
         <div class="maintenance">
           <div><strong>🧹 Mantenimiento</strong><p id="condition"></p></div>

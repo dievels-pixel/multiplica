@@ -1,10 +1,10 @@
 "use strict";
 
 const upgrades = [
-  { key: "rooms", name: "Habitaciones", action: "Construir habitación", icon: "🛏️", cost: 24, effect: "Más camas y más monedas por acierto.", space: true },
-  { key: "dining", name: "Comedores", action: "Construir comedor", icon: "🍽️", cost: 30, effect: "Menos colas para desayunar.", space: true },
-  { key: "baths", name: "Baños", action: "Construir baño", icon: "🚿", cost: 26, effect: "Menos esperas para ducharse.", space: true },
-  { key: "staff", name: "Empleados", action: "Contratar empleado", icon: "🛎️", cost: 34, effect: "Más atención y menos desgaste." },
+  { key: "rooms", name: "Habitaciones", action: "Construir habitación", icon: "🛏️", cost: 24, effect: "Dos plazas y más ingresos por estancia.", space: true },
+  { key: "dining", name: "Comedores", action: "Construir comedor", icon: "🍽️", cost: 30, effect: "Uno por cada 4 huéspedes.", space: true },
+  { key: "baths", name: "Baños", action: "Construir baño", icon: "🚿", cost: 26, effect: "Uno por cada 4 huéspedes.", space: true },
+  { key: "staff", name: "Empleados", action: "Contratar empleado", icon: "🛎️", cost: 34, effect: "Uno por cada 6 huéspedes. Reduce desgaste." },
   { key: "expansions", name: "Ampliaciones", action: "Ampliar hotel", icon: "🧱", cost: 40, effect: "Abre 3 espacios para construir." },
 ];
 const guests = [
@@ -15,9 +15,17 @@ const guests = [
   ["👩🏻", "Aitana", "¡Qué ganas de descansar en mi habitación!"],
   ["🧑🏼", "Nico", "Ojalá pueda desayunar antes de ir a la piscina."],
 ];
-const defaults = { coins: 20, stays: 0, wear: 0, rooms: 1, dining: 0, baths: 1, staff: 1, expansions: 0, table: 0 };
+const defaults = { coins: 20, stays: 0, wear: 0, rooms: 1, dining: 0, baths: 1, staff: 1, expansions: 0, table: 0, streak: 0, gifts: 0, incident: 0, reputation: 1 };
 const storageKey = "hotel-multiplica-v1";
-const cleanCost = 12;
+const seconds = 15;
+const serviceWindow = 5;
+const prizes = ["🏊 Piscina", "🗿 Estatua", "🌴 Jardín tropical"];
+const disasters = [
+  "Se atascó una ducha y se inundó el pasillo.",
+  "Se quemaron las tostadas y hubo que abrir las ventanas.",
+  "Se extraviaron unas maletas y hubo que buscarlas.",
+  "Se derramó zumo en el vestíbulo.",
+];
 const numbers = Array.from({ length: 12 }, (_, index) => index + 1);
 const byId = (id) => document.getElementById(id);
 const table = byId("table");
@@ -29,13 +37,19 @@ const cards = new Map();
 const decks = new Map();
 const state = load();
 let current;
-let answered = false;
+let answered = true;
+let startedAt = 0;
+let frame;
+const timer = byId("timer");
 let guestIndex = state.stays;
 
 function load() {
-  const result = { ...defaults };
+  const result = { ...defaults, reviews: [] };
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
+    if (Array.isArray(saved?.reviews)) {
+      result.reviews = saved.reviews.filter((value) => Number.isInteger(value) && value >= 0 && value <= 5).slice(-serviceWindow);
+    }
     for (const [key, minimum] of Object.entries(defaults)) {
       const value = saved?.[key];
       const min = key === "coins" ? 0 : minimum;
@@ -46,6 +60,9 @@ function load() {
   }
   result.table = Math.min(12, result.table);
   result.wear = Math.min(36, result.wear);
+  result.gifts = Math.min(prizes.length, result.gifts);
+  result.reputation = Math.min(5, result.reputation);
+  result.incident = Math.min(36, result.incident);
   return result;
 }
 
@@ -61,42 +78,150 @@ function freeSpace() {
   return 4 + 3 * state.expansions - state.rooms - state.dining - state.baths;
 }
 
-function satisfaction() {
-  const demand = Math.min(15, Math.floor(state.stays / 5));
-  const comfort = 48 + state.rooms * 4 + state.dining * 12 + state.baths * 8 + state.staff * 9 + state.expansions * 4;
-  return Math.max(20, Math.min(100, comfort - demand * 2 - state.wear));
+function occupancy() {
+  const demand = 2 + Math.floor(2 * (Math.sqrt(1 + state.stays / 2) - 1));
+  const guests = Math.min(demand, state.rooms * 2);
+  return {
+    guests,
+    waitlist: Math.min(6, demand - guests),
+    dining: Math.max(0, Math.ceil(guests / 4) - state.dining),
+    baths: Math.max(0, Math.ceil(guests / 4) - state.baths),
+    staff: Math.max(0, Math.ceil(guests / 6) - state.staff),
+  };
 }
 
-function earnings() {
-  return { base: 12 + Math.min(state.rooms - 1, 8) * 2, tip: Math.floor(satisfaction() / 10) };
+function serviceScore(fraction) {
+  if (fraction <= .25) return 5;
+  if (fraction <= .4) return 4;
+  if (fraction <= .65) return 3;
+  return fraction < 1 ? 2 : 1;
+}
+
+function satisfaction() {
+  const needs = occupancy();
+  const servicePenalty = state.reviews.length ?
+    (5 - state.reviews.reduce((sum, score) => sum + score, 0) / state.reviews.length) * 3 : 0;
+  return Math.max(15, Math.min(100, Math.round(100 - needs.waitlist * 3 - Math.min(32, needs.dining * 10 + needs.baths * 11 + needs.staff * 12)
+    - Math.round(state.wear / 2) - state.incident - servicePenalty + state.gifts * 3)));
+}
+
+function rating() {
+  if (!state.reviews.length) return 1;
+  const average = state.reviews.reduce((sum, score) => sum + score, 0) / state.reviews.length;
+  const perfect = state.reviews.length === serviceWindow && state.reviews.every((score) => score === 5);
+  if (perfect && satisfaction() >= 88) return 5;
+  return Math.max(1, Math.min(4, Math.round(average), Math.floor(satisfaction() / 20)));
+}
+
+function earnings(fraction = 0) {
+  const base = 12 + Math.min(state.rooms - 1, 12) * 2 + (state.reputation - 1) * 4;
+  const maximum = Math.max(2, Math.floor(satisfaction() / 8) + state.reputation - 1);
+  return { base, tip: 1 + Math.round((maximum - 1) * (1 - Math.min(1, fraction))) };
 }
 
 function price(upgrade) {
-  return upgrade.cost + (state[upgrade.key] - defaults[upgrade.key]) * 8;
+  return Math.round((upgrade.cost + (state[upgrade.key] - defaults[upgrade.key]) * 12)
+    * (1 + (state.reputation - 1) * .23));
+}
+
+function paintTimer(fraction, waiting = false) {
+  const remaining = Math.max(0, seconds * (1 - fraction));
+  timer.firstElementChild.style.transform = "scaleX(" + remaining / seconds + ")";
+  timer.dataset.phase = fraction <= .25 ? "fast" : fraction <= .65 ? "medium" : "slow";
+  timer.setAttribute("aria-valuenow", Math.ceil(remaining));
+  byId("time-text").textContent = waiting ? seconds + " s por huésped" :
+    (remaining ? Math.ceil(remaining) + " s" : "Propina mínima");
+  const pay = earnings(fraction);
+  byId("reward").textContent = pay.base + " monedas + " + pay.tip + " de propina";
+}
+
+function tick(now) {
+  const fraction = elapsed(now);
+  paintTimer(fraction);
+  if (fraction < 1) frame = requestAnimationFrame(tick);
+}
+
+function elapsed(now = performance.now()) {
+  return Math.min(1, Math.max(0, (now - startedAt) / (seconds * 1000)));
+}
+
+function shortage(quantity, singular, plural) {
+  return quantity === 1 ? "Falta 1 " + singular + "." : "Faltan " + quantity + " " + plural + ".";
 }
 
 function refresh() {
-  const happy = satisfaction();
-  const reward = earnings();
-  const improvementCount = upgrades.reduce((sum, upgrade) => sum + state[upgrade.key] - defaults[upgrade.key], 0);
-  const stars = Math.min(5, 1 + Math.floor(improvementCount / 2));
+  const happy = Math.min(100, satisfaction());
+  const stars = rating();
+  const needs = occupancy();
   byId("coins").textContent = state.coins;
   byId("happiness").textContent = happy + "%";
   byId("stays").textContent = state.stays;
-  byId("space").textContent = freeSpace() + " espacio(s) libre(s)";
+  const space = freeSpace();
+  byId("space").textContent = space + (space === 1 ? " espacio libre" : " espacios libres");
   byId("rating").textContent = stars === 1 ? "1 estrella" : stars + " estrellas";
   byId("stars").textContent = "★".repeat(stars) + "☆".repeat(5 - stars);
-  byId("goal").textContent = stars === 5 ? "¡Tu hotel ya tiene cinco estrellas!" : "Cada dos mejoras, ganas una estrella.";
-  byId("reward").textContent = "Por acertar ahora: " + reward.base + " monedas + " + reward.tip + " de propina.";
+  byId("goal").textContent = "Reputación " + state.reputation + "/5 · Para tener 5 estrellas, acierta los últimos 5 en el primer cuarto y mantén la satisfacción en el 88% o más.";
+  byId("streak").textContent = "🔥 Racha: " + state.streak + " · Próximo premio a los " + (Math.floor(state.streak / 10) + 1) * 10 + " aciertos.";
+  byId("capacity").textContent = needs.guests + " huéspedes en " + state.rooms * 2 + " plazas";
+  const complaints = [];
+  if (needs.waitlist) complaints.push("«¡No quedan camas!» Construye habitaciones.");
+  if (needs.dining) complaints.push("«¡Qué cola para desayunar!» " + shortage(needs.dining, "comedor", "comedores"));
+  if (needs.baths) complaints.push("«¡Los baños están ocupados!» " + shortage(needs.baths, "baño", "baños"));
+  if (needs.staff) complaints.push("«¡Nadie nos atiende!» " + shortage(needs.staff, "empleado", "empleados"));
+  const list = byId("complaints");
+  list.replaceChildren(...(complaints.length ? complaints : ["Los huéspedes tienen todo lo que necesitan."]).map((message) => {
+    const item = document.createElement("li");
+    item.textContent = message;
+    return item;
+  }));
+  byId("guest-request").textContent = complaints[0]?.split("»")[0]?.concat("»") || guests[guestIndex % guests.length][2];
+  const awards = byId("awards");
+  if (awards.children.length !== state.gifts) {
+    const prize = document.createElement("span");
+    prize.className = "award";
+    for (let index = awards.children.length; index < state.gifts; index++) {
+      const badge = prize.cloneNode();
+      badge.textContent = prizes[index];
+      awards.append(badge);
+    }
+  }
+  awards.hidden = !state.gifts;
   byId("condition").textContent = state.wear === 0 ? "Todo limpio. Cada estancia desgasta un poco el hotel." :
-    "El desgaste resta " + state.wear + " puntos de satisfacción. Limpia para recuperarlos.";
-  clean.disabled = state.wear === 0 || state.coins < cleanCost;
+    "Desgaste: " + state.wear + "/36. Limpia para recuperar satisfacción.";
+  const cleaning = 10 + state.reputation * 2;
+  clean.textContent = "🪙 " + cleaning;
+  clean.setAttribute("aria-label", "Limpiar el hotel por " + cleaning + " monedas");
+  clean.disabled = state.wear === 0 || state.coins < cleaning;
 
   for (const upgrade of upgrades) {
-    const { count, button } = cards.get(upgrade.key);
+    const { count, button, row, inventory } = cards.get(upgrade.key);
     const cost = price(upgrade);
-    const needsSpace = upgrade.space && freeSpace() <= 0;
-    count.textContent = upgrade.name + " · " + state[upgrade.key];
+    const needsSpace = upgrade.space && space <= 0;
+    const quantity = state[upgrade.key];
+    count.textContent = upgrade.name + " · " + quantity;
+    row.dataset.shortage = Boolean(needs[upgrade.key]);
+    if (inventory.dataset.quantity !== String(quantity)) {
+      const oldCount = Number(inventory.dataset.quantity || quantity);
+      inventory.dataset.quantity = quantity;
+      inventory.replaceChildren();
+      for (let index = 0; index < Math.min(6, quantity); index++) {
+        const item = document.createElement("span");
+        item.textContent = upgrade.key === "staff" ? "🧑‍💼" : upgrade.icon;
+        inventory.append(item);
+      }
+      if (quantity > 6) {
+        const extra = document.createElement("b");
+        extra.textContent = "+" + (quantity - 6);
+        inventory.append(extra);
+      }
+      if (quantity > oldCount && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        inventory.lastElementChild?.animate([
+          { transform: "translateY(6px) scale(.75)", opacity: .3 },
+          { transform: "translateY(-5px) scale(1.25)", opacity: 1 },
+          { transform: "translateY(0) scale(1)", opacity: 1 },
+        ], { duration: 440, easing: "ease-out" });
+      }
+    }
     button.textContent = needsSpace ? "Sin espacio" : "🪙 " + cost;
     button.setAttribute("aria-label", upgrade.action + (needsSpace ? ". Amplía el hotel para tener espacio." : " por " + cost + " monedas"));
     button.disabled = state.coins < cost || needsSpace;
@@ -142,10 +267,11 @@ function choices({ a, b, product }) {
 function showQuestion(focus = true) {
   current = drawQuestion(state.table);
   answered = false;
-  const [avatar, name, request] = guests[guestIndex % guests.length];
+  table.disabled = true;
+  const [avatar, name] = guests[guestIndex % guests.length];
   byId("avatar").textContent = avatar;
   byId("guest-name").textContent = name;
-  byId("guest-request").textContent = request;
+
   question.textContent = current.a + " × " + current.b + " = ?";
   byId("feedback").textContent = "";
   next.hidden = true;
@@ -162,25 +288,63 @@ function showQuestion(focus = true) {
     button.addEventListener("click", () => answer(value));
     answers.append(button);
   }
+  refresh();
+  startedAt = performance.now();
+  cancelAnimationFrame(frame);
+  tick(startedAt);
   if (focus) question.focus();
 }
 
 function answer(value) {
   if (answered) return;
+  const fraction = elapsed();
+  cancelAnimationFrame(frame);
+  paintTimer(fraction);
   answered = true;
+  table.disabled = false;
   const correct = value === current.product;
+  const previousStars = rating();
+  const score = correct ? serviceScore(fraction) : 0;
+  let message;
+  let event = "";
   if (correct) {
-    const { base, tip } = earnings();
+    const { base, tip } = earnings(fraction);
     state.coins += base + tip;
     state.stays++;
-    state.wear = Math.min(36, state.wear + Math.max(1, 4 - state.staff));
-    byId("feedback").textContent = "¡Acierto! +" + base + " monedas y +" + tip + " de propina.";
+    state.streak++;
+    state.incident = Math.max(0, state.incident - 3);
+    const workload = Math.floor(occupancy().guests / Math.max(1, state.staff * 3));
+    state.wear = Math.min(36, state.wear + Math.max(1, 1 + workload - Math.min(2, state.staff)));
+    message = "¡Acierto! +" + base + " monedas y +" + tip + " de propina. Servicio: " + score + "/5.";
+    if (state.streak % 10 === 0) {
+      if (state.gifts < prizes.length) {
+        event = "¡Racha de " + state.streak + "! Los huéspedes te regalan: " + prizes[state.gifts++] + ".";
+      } else {
+        const bonus = base * 3;
+        state.coins += bonus;
+        event = "¡Racha de " + state.streak + "! Fiesta en el hotel: +" + bonus + " monedas.";
+      }
+    }
     next.textContent = "Siguiente huésped";
-    save();
   } else {
-    byId("feedback").textContent = "Casi. " + current.a + " × " + current.b + " = " + current.product + ". Prueba otra.";
+    state.streak = 0;
+    state.incident = Math.min(36, state.incident + 9);
+    state.wear = Math.min(36, state.wear + 4);
+    event = disasters[Math.floor(Math.random() * disasters.length)] + " Baja la satisfacción.";
+    message = "Casi. " + current.a + " × " + current.b + " = " + current.product + ".";
     next.textContent = "Otra multiplicación";
   }
+  state.reviews.push(score);
+  if (state.reviews.length > serviceWindow) state.reviews.shift();
+  const stars = rating();
+  const reputation = state.reputation;
+  state.reputation = Math.max(reputation, Math.min(stars, 1 + Math.floor(state.stays / 5)));
+  if (state.reputation > reputation) event += " ¡Sube tu reputación! Aumentan los ingresos y los precios.";
+  else if (stars < previousStars) event += " El hotel baja a " + stars + (stars === 1 ? " estrella." : " estrellas.");
+  byId("event").textContent = event.trim();
+  byId("event").dataset.kind = correct ? "good" : "bad";
+  byId("feedback").textContent = message;
+  save();
   for (const button of answers.children) {
     const option = Number(button.dataset.value);
     button.disabled = true;
@@ -197,8 +361,6 @@ table.value = String(state.table);
 table.addEventListener("change", () => {
   state.table = Number(table.value);
   save();
-  guestIndex = state.stays;
-  showQuestion();
 });
 
 for (const upgrade of upgrades) {
@@ -212,20 +374,23 @@ for (const upgrade of upgrades) {
   const count = document.createElement("strong");
   const effect = document.createElement("p");
   effect.textContent = upgrade.effect;
-  details.append(count, effect);
+  const inventory = document.createElement("div");
+  inventory.className = "inventory";
+  inventory.setAttribute("aria-hidden", "true");
+  details.append(count, effect, inventory);
   const button = document.createElement("button");
   button.type = "button";
   button.className = "purchase";
   button.addEventListener("click", () => purchase(upgrade));
   row.append(icon, details, button);
   byId("upgrades").append(row);
-  cards.set(upgrade.key, { count, button });
+  cards.set(upgrade.key, { count, button, row, inventory });
 }
 
-clean.setAttribute("aria-label", "Limpiar el hotel por 12 monedas");
 clean.addEventListener("click", () => {
-  if (!state.wear || state.coins < cleanCost) return;
-  state.coins -= cleanCost;
+  const cost = 10 + state.reputation * 2;
+  if (!state.wear || state.coins < cost) return;
+  state.coins -= cost;
   state.wear = 0;
   save();
   refresh();
@@ -250,4 +415,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 refresh();
-showQuestion(false);
+paintTimer(0, true);
+question.textContent = "¿Listo para abrir?";
+next.textContent = "Empezar turno";
+next.hidden = false;
+byId("guest-name").textContent = "Recepción cerrada";
+byId("guest-request").textContent = "Pulsa Empezar turno cuando estés listo.";
+byId("avatar").textContent = "🛎️";
